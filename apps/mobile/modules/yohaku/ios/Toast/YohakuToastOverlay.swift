@@ -8,10 +8,11 @@ enum YohakuToastOverlay {
     fileprivate let canvas = Canvas()
 
     func show(message: String) {
+      guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
       attachIfNeeded()
       window?.isHidden = false
+      window?.layoutIfNeeded()
       canvas.enqueue(message)
-      UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
   }
 
@@ -25,11 +26,14 @@ enum YohakuToastOverlay {
 
   fileprivate final class Canvas: UIView {
     private var pills: [YohakuToastPillView] = []
+    private var timer: Timer?
+    private var dragOffset: CGFloat = 0
 
     override init(frame: CGRect) {
       super.init(frame: frame)
       backgroundColor = .clear
       isOpaque = false
+      addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan)))
     }
 
     @available(*, unavailable)
@@ -37,136 +41,134 @@ enum YohakuToastOverlay {
       fatalError("init(coder:) has not been implemented")
     }
 
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+      let hit = super.hitTest(point, with: event)
+      return hit === self ? nil : hit
+    }
+
     func enqueue(_ message: String) {
-      let maxWidth = min(bounds.width - 32, 360)
-      let pill = YohakuToastPillView(message: message, maxWidth: maxWidth)
-      pill.onDismiss = { [weak self] item, towardIsland in
-        self?.dismiss(item, towardIsland: towardIsland)
+      if pills.last?.message == message {
+        restartTimer()
+        return
       }
+      let pill = YohakuToastPillView(message: message)
       addSubview(pill)
       pills.append(pill)
       while pills.count > 3 {
-        let oldest = pills.removeFirst()
-        oldest.clearTimer()
-        oldest.removeFromSuperview()
+        pills.removeFirst().removeFromSuperview()
       }
+      dragOffset = 0
       layoutPills(entering: pill)
+      restartTimer()
+      UIAccessibility.post(notification: .announcement, argument: message)
+      UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     override func layoutSubviews() {
       super.layoutSubviews()
-      layoutPills(entering: nil)
+      layoutPills()
     }
 
-    private func layoutPills(entering: YohakuToastPillView?) {
+    private func layoutPills(entering: YohakuToastPillView? = nil) {
+      guard let front = pills.last else { return }
       let reduced = UIAccessibility.isReduceMotionEnabled
+      let size = front.fittedSize(maxWidth: min(bounds.width - 32, 360))
       for (index, pill) in pills.reversed().enumerated() {
-        let rest = restFrame(for: pill, index: index)
-        let scale = 1 - CGFloat(index) * 0.05
+        let depth = CGFloat(index)
+        let scale = 1 - depth * 0.05
+        let center = CGPoint(
+          x: bounds.midX,
+          y: safeAreaInsets.top + 8 + size.height / 2 + depth * 6 + dragOffset
+        )
         pill.isUserInteractionEnabled = index == 0
-        pill.layer.zPosition = CGFloat(100 - index)
+        pill.showsContent = index == 0
+        pill.layer.zPosition = CGFloat(3 - index)
         if pill === entering {
-          pill.bounds = CGRect(origin: .zero, size: rest.size)
-          pill.center = CGPoint(x: rest.midX, y: rest.midY)
-          if reduced {
-            pill.transform = .identity
-            pill.alpha = 1
-          } else {
-            pill.transform = islandTransform(for: rest)
-            pill.alpha = 1
-            UIView.animate(
-              withDuration: 0.5,
-              delay: 0,
-              usingSpringWithDamping: 0.78,
-              initialSpringVelocity: 0.6
-            ) {
-              pill.transform = CGAffineTransform(scaleX: scale, y: scale)
-            }
-          }
-        } else if reduced {
-          pill.bounds = CGRect(origin: .zero, size: rest.size)
-          pill.center = CGPoint(x: rest.midX, y: rest.midY)
+          pill.bounds = CGRect(origin: .zero, size: size)
+          pill.center = center
+          pill.transform = reduced ? .identity : CGAffineTransform(translationX: 0, y: -10)
+            .scaledBy(x: 0.96, y: 0.96)
+          pill.alpha = 0
+        }
+        let changes = {
+          pill.bounds = CGRect(origin: .zero, size: size)
+          pill.center = center
           pill.transform = CGAffineTransform(scaleX: scale, y: scale)
-        } else {
+          pill.alpha = 1 - depth * 0.12
+        }
+        if entering != nil && !reduced {
           UIView.animate(
-            withDuration: 0.42,
-            delay: 0,
-            usingSpringWithDamping: 0.82,
-            initialSpringVelocity: 0.3
-          ) {
-            pill.bounds = CGRect(origin: .zero, size: rest.size)
-            pill.center = CGPoint(x: rest.midX, y: rest.midY)
-            pill.transform = CGAffineTransform(scaleX: scale, y: scale)
-          }
+            withDuration: 0.35, delay: 0,
+            usingSpringWithDamping: 0.88, initialSpringVelocity: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction], animations: changes
+          )
+        } else {
+          changes()
         }
       }
     }
 
-    private func dismiss(_ pill: YohakuToastPillView, towardIsland: Bool) {
-      guard let index = pills.firstIndex(of: pill) else { return }
-      pills.remove(at: index)
-      pill.clearTimer()
-      let reduced = UIAccessibility.isReduceMotionEnabled
-      let finish = { [weak self] in
-        pill.removeFromSuperview()
-        if self?.pills.isEmpty == true {
+    private func restartTimer() {
+      timer?.invalidate()
+      // VoiceOver needs time to finish announcing the message before its element disappears.
+      let duration: TimeInterval = UIAccessibility.isVoiceOverRunning ? 5 : 2.5
+      timer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
+        self?.dismiss()
+      }
+    }
+
+    private func dismiss() {
+      timer?.invalidate()
+      timer = nil
+      let departing = pills
+      pills.removeAll()
+      dragOffset = 0
+      for pill in departing { pill.isUserInteractionEnabled = false }
+      UIView.animate(
+        withDuration: UIAccessibility.isReduceMotionEnabled ? 0 : 0.2,
+        delay: 0, options: [.beginFromCurrentState, .curveEaseIn]
+      ) {
+        for pill in departing {
+          pill.alpha = 0
+          pill.transform = pill.transform.translatedBy(x: 0, y: -6)
+        }
+      } completion: { [weak self] _ in
+        departing.forEach { $0.removeFromSuperview() }
+        if self?.subviews.isEmpty == true {
           YohakuToastOverlay.shared.window?.isHidden = true
         }
       }
-      if reduced {
-        finish()
-        layoutPills(entering: nil)
-        return
-      }
-      UIView.animate(
-        withDuration: towardIsland ? 0.28 : 0.22,
-        delay: 0,
-        options: .curveEaseIn
-      ) {
-        if towardIsland {
-          pill.transform = self.islandTransform(for: pill.frame)
+    }
+
+    override func accessibilityPerformEscape() -> Bool {
+      guard !pills.isEmpty else { return false }
+      dismiss()
+      return true
+    }
+
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+      let translation = gesture.translation(in: self).y
+      switch gesture.state {
+      case .began:
+        timer?.invalidate()
+      case .changed:
+        dragOffset = translation < 0 ? translation : translation / (translation + 120) * 40
+        layoutPills()
+      case .ended, .cancelled:
+        if gesture.state == .ended && (translation < -40 || gesture.velocity(in: self).y < -600) {
+          dismiss()
         } else {
-          pill.alpha = 0
-          pill.transform = pill.transform.translatedBy(x: 0, y: -12)
-            .scaledBy(x: 0.92, y: 0.92)
+          dragOffset = 0
+          UIView.animate(
+            withDuration: UIAccessibility.isReduceMotionEnabled ? 0 : 0.3,
+            delay: 0, usingSpringWithDamping: 0.88, initialSpringVelocity: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction]
+          ) { self.layoutPills() }
+          restartTimer()
         }
-        pill.alpha = 0
-      } completion: { _ in
-        finish()
+      default:
+        break
       }
-      layoutPills(entering: nil)
-    }
-
-    private func restFrame(for pill: YohakuToastPillView, index: Int) -> CGRect {
-      let size = pill.fittedSize()
-      let island = islandRect()
-      let x = (bounds.width - size.width) / 2
-      let y = island.maxY + 8 + CGFloat(index) * 10
-      return CGRect(origin: CGPoint(x: x, y: y), size: size)
-    }
-
-    private func islandRect() -> CGRect {
-      let inset = safeAreaInsets.top
-      let hasIsland = inset >= 59
-      let size = hasIsland ? CGSize(width: 126, height: 37) : CGSize(width: 72, height: 24)
-      let y: CGFloat = hasIsland ? 11 : 6
-      return CGRect(
-        x: (bounds.width - size.width) / 2,
-        y: y,
-        width: size.width,
-        height: size.height
-      )
-    }
-
-    private func islandTransform(for rest: CGRect) -> CGAffineTransform {
-      let island = islandRect()
-      guard rest.width > 0, rest.height > 0 else { return .identity }
-      let scaleX = island.width / rest.width
-      let scaleY = island.height / rest.height
-      let dx = island.midX - rest.midX
-      let dy = island.midY - rest.midY
-      return CGAffineTransform(translationX: dx, y: dy)
-        .scaledBy(x: scaleX, y: scaleY)
     }
   }
 }

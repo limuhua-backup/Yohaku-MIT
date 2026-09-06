@@ -1,56 +1,50 @@
 import UIKit
 
 final class YohakuToastPillView: UIView {
-  var onDismiss: ((YohakuToastPillView, Bool) -> Void)?
-
-  private let blur = UIVisualEffectView()
-  private let glyph = UIView()
+  let message: String
+  private let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
   private let check = UIImageView()
   private let label = UILabel()
-  private let close = UIButton(type: .system)
-  private var timer: Timer?
-  private var dragStart: CGPoint = .zero
-  private let maxLabelWidth: CGFloat
 
-  init(message: String, maxWidth: CGFloat) {
-    maxLabelWidth = max(80, maxWidth - 72)
+  var showsContent = true {
+    didSet {
+      label.isHidden = !showsContent
+      check.isHidden = !showsContent
+      isAccessibilityElement = showsContent
+      accessibilityElementsHidden = !showsContent
+    }
+  }
+
+  init(message: String) {
+    self.message = message
     super.init(frame: .zero)
-    clipsToBounds = true
     layer.cornerCurve = .continuous
-
-    installBlur()
+    layer.shadowColor = UIColor.black.cgColor
+    layer.shadowOpacity = 0.08
+    layer.shadowRadius = 12
+    layer.shadowOffset = CGSize(width: 0, height: 4)
+    blur.clipsToBounds = true
+    blur.layer.cornerCurve = .continuous
     addSubview(blur)
 
-    glyph.backgroundColor = .systemGreen
-    glyph.clipsToBounds = true
-    addSubview(glyph)
+    label.text = message
+    label.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(
+      for: .systemFont(ofSize: 16, weight: .medium)
+    )
+    label.adjustsFontForContentSizeCategory = true
+    label.textColor = .label
+    label.numberOfLines = 0
+    blur.contentView.addSubview(label)
 
     check.image = UIImage(systemName: "checkmark")?
-      .withConfiguration(
-        UIImage.SymbolConfiguration(pointSize: 11, weight: .bold)
-      )
-    check.tintColor = .white
+      .withConfiguration(UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold))
+    check.tintColor = .systemGreen
     check.contentMode = .center
-    glyph.addSubview(check)
-
-    label.text = message
-    label.font = .systemFont(ofSize: 13, weight: .medium)
-    label.textColor = .label
-    label.numberOfLines = 3
-    addSubview(label)
-
-    let closeImage = UIImage(systemName: "xmark.circle.fill")?
-      .withConfiguration(
-        UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
-      )
-    close.setImage(closeImage, for: .normal)
-    close.tintColor = .tertiaryLabel
-    close.addTarget(self, action: #selector(tapClose), for: .touchUpInside)
-    addSubview(close)
-
-    let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan))
-    addGestureRecognizer(pan)
-    restartTimer()
+    blur.contentView.addSubview(check)
+    isAccessibilityElement = true
+    accessibilityIdentifier = "yohaku.toast"
+    accessibilityLabel = message
+    accessibilityTraits = .staticText
   }
 
   @available(*, unavailable)
@@ -58,102 +52,21 @@ final class YohakuToastPillView: UIView {
     fatalError("init(coder:) has not been implemented")
   }
 
-  deinit {
-    timer?.invalidate()
-  }
-
-  func fittedSize() -> CGSize {
+  func fittedSize(maxWidth: CGFloat) -> CGSize {
     let text = label.sizeThatFits(
-      CGSize(width: maxLabelWidth, height: 16 * 3)
+      CGSize(width: max(1, maxWidth - 64), height: .greatestFiniteMagnitude)
     )
-    let height = max(36, text.height + 16)
-    let width = min(
-      6 + 24 + 8 + ceil(text.width) + 4 + 28 + 6,
-      maxLabelWidth + 72
-    )
-    return CGSize(width: max(width, 120), height: height)
+    return CGSize(width: min(maxWidth, ceil(text.width) + 64), height: max(48, ceil(text.height) + 24))
   }
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    layer.cornerRadius = bounds.height / 2
+    let radius = min(24, bounds.height / 2)
+    layer.cornerRadius = radius
+    layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: radius).cgPath
     blur.frame = bounds
-    sendSubviewToBack(blur)
-    glyph.frame = CGRect(x: 6, y: (bounds.height - 24) / 2, width: 24, height: 24)
-    glyph.layer.cornerRadius = 12
-    check.frame = glyph.bounds
-    close.frame = CGRect(
-      x: bounds.width - 34,
-      y: (bounds.height - 28) / 2,
-      width: 28,
-      height: 28
-    )
-    let labelX: CGFloat = 38
-    let labelW = max(0, close.frame.minX - 4 - labelX)
-    let text = label.sizeThatFits(CGSize(width: labelW, height: bounds.height))
-    label.frame = CGRect(
-      x: labelX,
-      y: (bounds.height - text.height) / 2,
-      width: labelW,
-      height: text.height
-    )
-  }
-
-  func restartTimer() {
-    timer?.invalidate()
-    timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { [weak self] _ in
-      guard let self else { return }
-      self.onDismiss?(self, false)
-    }
-  }
-
-  func clearTimer() {
-    timer?.invalidate()
-    timer = nil
-  }
-
-  private func installBlur() {
-    blur.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-    #if compiler(>=6.2)
-      if #available(iOS 26.0, *) {
-        blur.effect = UIGlassEffect(style: .regular)
-        return
-      }
-    #endif
-    blur.effect = UIBlurEffect(style: .systemThinMaterial)
-  }
-
-  @objc private func tapClose() {
-    onDismiss?(self, false)
-  }
-
-  @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
-    let translation = gesture.translation(in: superview)
-    switch gesture.state {
-    case .began:
-      clearTimer()
-      dragStart = center
-    case .changed:
-      let upward = min(0, translation.y)
-      let resist = translation.y > 0 ? translation.y / (translation.y + 120) * 40 : 0
-      center = CGPoint(x: dragStart.x, y: dragStart.y + upward + resist)
-    case .ended, .cancelled:
-      let velocity = gesture.velocity(in: superview)
-      if translation.y < -56 || velocity.y < -800 {
-        onDismiss?(self, true)
-      } else {
-        UIView.animate(
-          withDuration: 0.35,
-          delay: 0,
-          usingSpringWithDamping: 0.82,
-          initialSpringVelocity: 0.4
-        ) {
-          self.center = self.dragStart
-        }
-        restartTimer()
-      }
-    default:
-      break
-    }
+    blur.layer.cornerRadius = radius
+    label.frame = CGRect(x: 20, y: 12, width: max(0, bounds.width - 64), height: bounds.height - 24)
+    check.frame = CGRect(x: bounds.width - 36, y: (bounds.height - 16) / 2, width: 16, height: 16)
   }
 }
