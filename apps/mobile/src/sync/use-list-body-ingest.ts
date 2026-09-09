@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 
 import type { ArticleBodyKind } from '@/api/article-body'
-import { ARTICLE_BODY_BATCH_LIMIT } from '@/api/article-body'
 import { useLocale } from '@/i18n'
 
 import { ingestArticleBodies } from './engine'
@@ -35,16 +34,13 @@ export function useListBodyIngest(
     const visibleIds = visibleIdsRef.current
     if (visibleIds === undefined) return
     const pool = itemsRef.current.filter((item) => visibleIds.includes(item.id))
-    const need = pool
-      .filter(needsListBody)
-      .slice(0, ARTICLE_BODY_BATCH_LIMIT)
-      .map((item) => ({
-        id: item.id,
-        kind: item.kind,
-        ...(typeof item.bodyVersion === 'number'
-          ? { bodyVersion: item.bodyVersion }
-          : {}),
-      }))
+    const need = pool.filter(needsListBody).map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      ...(typeof item.bodyVersion === 'number'
+        ? { bodyVersion: item.bodyVersion }
+        : {}),
+    }))
     if (need.length === 0) return
     const timer = setTimeout(() => {
       void ingestArticleBodies(need, locale)

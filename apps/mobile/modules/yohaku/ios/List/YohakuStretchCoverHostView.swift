@@ -4,6 +4,8 @@ import UIKit
 final class YohakuNoteHeroHostView: ExpoView {
   private let noteHeroSlot = UIView()
   private var noteHero = YohakuNoteHeroSpec()
+  private var noteHeroRole: YohakuNoteHeroSlotRole = .detail
+  private var noteHeroContentInsetTop: CGFloat = 0
   private var noteHeroMetaColor: UIColor?
   private var noteHeroTitleColor: UIColor?
   private weak var observedScroll: UIScrollView?
@@ -46,6 +48,16 @@ final class YohakuNoteHeroHostView: ExpoView {
     super.layoutSubviews()
     noteHeroSlot.frame = bounds
     attachScrollIfNeeded()
+    updateNoteHero()
+  }
+
+  func setNoteHeroRole(_ value: String) {
+    noteHeroRole = value == "list" ? .list : .detail
+    updateNoteHero()
+  }
+
+  func setNoteHeroContentInsetTop(_ value: Double) {
+    noteHeroContentInsetTop = CGFloat(value)
     updateNoteHero()
   }
 
@@ -126,14 +138,16 @@ final class YohakuNoteHeroHostView: ExpoView {
       noteHero.coverUri?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       == false
     let laid = YohakuNoteHeroLayout.frame(
-      cellY: hasCover ? -topInset - offsetY : -offsetY,
+      cellY: noteHeroRole == .list
+        ? noteHeroContentInsetTop - offsetY
+        : (hasCover ? -topInset - offsetY : -offsetY),
       heroHeight: CGFloat(noteHero.height),
       width: bounds.width,
       stretches: hasCover
     )
     YohakuSharedNoteHeroCoordinator.shared.update(
       slot: noteHeroSlot,
-      role: .detail,
+      role: noteHeroRole,
       spec: noteHero.id.isEmpty ? nil : noteHero,
       titleColor: noteHeroTitleColor,
       metaColor: noteHeroMetaColor,

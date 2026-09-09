@@ -8,7 +8,6 @@ import { usePaperTabBarInset } from '@/components/navigation/paper-tab-bar-inset
 import { AppText } from '@/components/ui'
 import { useDatabaseSnapshot } from '@/db/use-database-snapshot'
 import { useLocale, useTranslations } from '@/i18n'
-import { openPost } from '@/lib/open-article'
 import { useCollapsingTitle } from '@/screens/details/use-collapsing-title'
 import { articleIdsFromVisible } from '@/screens/lists/flatten-posts-list'
 import { PostContextLink } from '@/screens/lists/post-context-link'
@@ -216,18 +215,6 @@ export function TagDetailScreen({ name }: { name: string }) {
           }}
           onRefresh={onRefresh}
           onScroll={onNativeScroll}
-          onItemPress={({ id }) => {
-            const post = postsById.get(id)
-            if (post) openPost(router, post)
-          }}
-          onLinkPress={(kind, value) => {
-            if (kind === 'category') {
-              router.push({
-                pathname: '/categories/[slug]',
-                params: { slug: value },
-              })
-            }
-          }}
           onVisibleItems={(items) =>
             setVisibleIds(articleIdsFromVisible(items, ['post']))
           }

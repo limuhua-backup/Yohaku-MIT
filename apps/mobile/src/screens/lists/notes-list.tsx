@@ -333,7 +333,7 @@ export function NotesListScreen() {
             topBlurProgress.set(
               scrollEdgeProgress(
                 event.nativeEvent.contentOffset.y +
-                  event.nativeEvent.adjustedContentInset.top,
+                  event.nativeEvent.contentInset.top,
               ),
             )
           }}

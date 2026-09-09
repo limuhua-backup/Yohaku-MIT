@@ -13,6 +13,11 @@ import { fonts } from '@/theme/fonts'
 import { usePalette } from '@/theme/palette'
 
 export function ThinkingActions({ item }: { item: ThinkingRow }) {
+  // A pending reaction belongs to its article, even when the list recycles this row.
+  return <ThinkingActionsContent item={item} key={item.id} />
+}
+
+function ThinkingActionsContent({ item }: { item: ThinkingRow }) {
   const t = useTranslations('comment')
   const palette = usePalette()
   const router = useRouter()

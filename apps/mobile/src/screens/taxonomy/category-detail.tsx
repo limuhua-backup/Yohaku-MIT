@@ -246,18 +246,6 @@ export function CategoryDetailScreen({ slug }: { slug: string }) {
           }}
           onRefresh={onRefresh}
           onScroll={onNativeScroll}
-          onItemPress={({ id }) => {
-            const post = postsById.get(id)
-            if (post) openPost(router, post)
-          }}
-          onLinkPress={(kind, value) => {
-            if (kind === 'tag') {
-              router.push({
-                pathname: '/posts/tag/[name]',
-                params: { name: value },
-              })
-            }
-          }}
           onVisibleItems={(items) =>
             setVisibleIds(articleIdsFromVisible(items, ['featured', 'post']))
           }

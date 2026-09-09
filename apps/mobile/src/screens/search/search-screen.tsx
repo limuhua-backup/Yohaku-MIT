@@ -313,7 +313,6 @@ export function SearchScreen({ scope: rawScope }: { scope: string | string[] | u
     <View style={[styles.screen, { backgroundColor: palette.surface.desk }]}>
       <SearchChrome />
       <EdgeEffectScrollView
-        automaticallyAdjustKeyboardInsets
         contentContainerStyle={styles.content}
         contentInset={{ bottom: dockHeight }}
         keyboardDismissMode="interactive"

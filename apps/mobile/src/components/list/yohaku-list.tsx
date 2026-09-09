@@ -1,19 +1,22 @@
-import type {
-  YohakuListNativeItem,
-  YohakuListVisibleItem,
-  YohakuNoteHeroSpec,
-} from '@modules/yohaku'
-import { YohakuListCellView, YohakuListView } from '@modules/yohaku'
+import type { YohakuNoteHeroSpec } from '@modules/yohaku'
+import { YohakuNoteHeroHost } from '@modules/yohaku'
+import { FlashList } from '@shopify/flash-list'
 import type { ReactNode } from 'react'
 import type {
   NativeScrollEvent,
   NativeSyntheticEvent,
+  ScrollViewProps,
   StyleProp,
   ViewStyle,
 } from 'react-native'
-import { StyleSheet } from 'react-native'
+import { ScrollView, StyleSheet, View } from 'react-native'
+import { ScrollViewMarker } from 'react-native-screens/experimental'
 
-export type YohakuListItem = YohakuListNativeItem
+import { listPrefetchWindow } from './list-prefetch-window'
+
+const viewabilityConfig = { minimumViewTime: 0, itemVisiblePercentThreshold: 0 }
+
+export type YohakuListItem = { id: string; type: string }
 
 export function YohakuList({
   contentInsetBottom = 0,
@@ -27,8 +30,6 @@ export function YohakuList({
   style,
   topEdgeEffectHidden = false,
   onEndReached,
-  onItemPress,
-  onLinkPress,
   onRefresh,
   onScroll,
   onVisibleItems,
@@ -40,59 +41,72 @@ export function YohakuList({
   noteHeroMetaColor?: string
   noteHeroTitleColor?: string
   onEndReached?: () => void
-  onItemPress?: (item: { id: string; type: string }) => void
-  onLinkPress?: (kind: string, value: string) => void
   onRefresh?: () => void
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void
-  onVisibleItems?: (items: YohakuListVisibleItem[]) => void
+  onVisibleItems?: (items: YohakuListItem[]) => void
   refreshing?: boolean
   renderItem: (item: YohakuListItem) => ReactNode
   style?: StyleProp<ViewStyle>
   topEdgeEffectHidden?: boolean
 }) {
-  return (
-    <YohakuListView
-      contentInsetBottom={contentInsetBottom}
-      contentInsetTop={contentInsetTop}
-      items={items}
-      noteHeroCoverPlaceholderUri={noteHero?.coverPlaceholderUri}
-      noteHeroCoverUri={noteHero?.coverUri}
-      noteHeroHeight={noteHero?.height}
-      noteHeroId={noteHero?.id}
-      noteHeroMeta={noteHero?.meta}
-      noteHeroMetaColor={noteHeroMetaColor}
-      noteHeroTitle={noteHero?.title}
-      noteHeroTitleColor={noteHeroTitleColor}
+  const list = (
+    <FlashList
+      contentInset={{ bottom: contentInsetBottom }}
+      contentInsetAdjustmentBehavior="automatic"
+      data={items}
+      getItemType={(item) => item.type}
+      keyExtractor={(item) => item.id}
       refreshing={refreshing}
-      style={style}
-      topEdgeEffectHidden={topEdgeEffectHidden}
-      onEndReached={() => onEndReached?.()}
-      onItemPress={(event) => onItemPress?.(event.nativeEvent)}
-      onRefresh={() => onRefresh?.()}
-      onScroll={onScroll}
-      onVisibleItems={(event) => onVisibleItems?.(event.nativeEvent.items)}
-      onLinkPress={(event) =>
-        onLinkPress?.(event.nativeEvent.kind, event.nativeEvent.value)
+      renderItem={({ item }) => <View>{renderItem(item)}</View>}
+      scrollEventThrottle={16}
+      scrollIndicatorInsets={{ bottom: contentInsetBottom }}
+      style={[styles.fill, style]}
+      viewabilityConfig={viewabilityConfig}
+      contentContainerStyle={{
+        paddingHorizontal: 20,
+        paddingTop: contentInsetTop,
+        paddingBottom: 24,
+      }}
+      renderScrollComponent={
+        topEdgeEffectHidden ? HiddenTopScrollView : undefined
       }
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.5}
+      onRefresh={onRefresh}
+      onScroll={onScroll}
+      onViewableItemsChanged={({ viewableItems }) =>
+        onVisibleItems?.(listPrefetchWindow(items, viewableItems))
+      }
+    />
+  )
+
+  return noteHero ? (
+    <YohakuNoteHeroHost
+      noteHeroContentInsetTop={contentInsetTop}
+      noteHeroCoverPlaceholderUri={noteHero.coverPlaceholderUri}
+      noteHeroCoverUri={noteHero.coverUri}
+      noteHeroHeight={noteHero.height}
+      noteHeroId={noteHero.id}
+      noteHeroMeta={noteHero.meta}
+      noteHeroMetaColor={noteHeroMetaColor}
+      noteHeroRole="list"
+      noteHeroTitle={noteHero.title}
+      noteHeroTitleColor={noteHeroTitleColor}
+      style={[styles.fill, style]}
     >
-      {items.map((item) => {
-        const child = renderItem(item)
-        return child == null ? null : (
-          <YohakuListCellView
-            itemId={item.id}
-            key={item.id}
-            style={styles.cell}
-          >
-            {child}
-          </YohakuListCellView>
-        )
-      })}
-    </YohakuListView>
+      {list}
+    </YohakuNoteHeroHost>
+  ) : (
+    list
   )
 }
 
-const styles = StyleSheet.create({
-  cell: {
-    marginHorizontal: 20,
-  },
-})
+const styles = StyleSheet.create({ fill: { flex: 1 } })
+
+function HiddenTopScrollView(props: ScrollViewProps) {
+  return (
+    <ScrollViewMarker scrollEdgeEffects={{ top: 'hidden' }} style={styles.fill}>
+      <ScrollView {...props} />
+    </ScrollViewMarker>
+  )
+}

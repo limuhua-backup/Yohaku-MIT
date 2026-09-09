@@ -116,7 +116,8 @@ export function SearchDock({
           paddingBottom: softwareKeyboard ? 8 : Math.max(insets.bottom, 12),
         },
       ]}
-      onLayout={(event) => onHeight(event.nativeEvent.layout.height)}
+      // The input lives outside the results scroll view; reserve its whole overlay.
+      onLayout={(event) => onHeight(event.nativeEvent.layout.height + keyboardHeight)}
     >
       {showRecents ? (
         <View style={styles.bubbles}>

@@ -336,6 +336,14 @@ public class YohakuModule: Module {
     View(YohakuNoteHeroHostView.self) {
       ViewName("YohakuNoteHeroHost")
 
+      Prop("noteHeroRole") { (view: YohakuNoteHeroHostView, value: String) in
+        view.setNoteHeroRole(value)
+      }
+
+      Prop("noteHeroContentInsetTop") { (view: YohakuNoteHeroHostView, value: Double) in
+        view.setNoteHeroContentInsetTop(value)
+      }
+
       Prop("noteHeroCoverPlaceholderUri") { (view: YohakuNoteHeroHostView, value: String?) in
         view.setNoteHeroCoverPlaceholderUri(value)
       }
@@ -386,79 +394,6 @@ public class YohakuModule: Module {
 
       Prop("stretchCoverUri") { (view: YohakuStretchCoverHostView, value: String?) in
         view.setStretchCoverUri(value)
-      }
-    }
-
-    View(YohakuListView.self) {
-      ViewName("YohakuList")
-
-      Events(
-        "onEndReached",
-        "onItemPress",
-        "onLinkPress",
-        "onRefresh",
-        "onScroll",
-        "onVisibleItems"
-      )
-
-      Prop("items") { (view: YohakuListView, items: [YohakuListItemSpec]) in
-        view.setItems(items)
-      }
-
-      Prop("contentInsetTop") { (view: YohakuListView, value: Double) in
-        view.setContentInsetTop(value)
-      }
-
-      Prop("contentInsetBottom") { (view: YohakuListView, value: Double) in
-        view.setContentInsetBottom(value)
-      }
-
-      Prop("refreshing") { (view: YohakuListView, refreshing: Bool) in
-        view.setRefreshing(refreshing)
-      }
-
-      Prop("noteHeroCoverPlaceholderUri") { (view: YohakuListView, value: String?) in
-        view.setNoteHeroCoverPlaceholderUri(value)
-      }
-
-      Prop("noteHeroCoverUri") { (view: YohakuListView, value: String?) in
-        view.setNoteHeroCoverUri(value)
-      }
-
-      Prop("noteHeroHeight") { (view: YohakuListView, value: Double) in
-        view.setNoteHeroHeight(value)
-      }
-
-      Prop("noteHeroId") { (view: YohakuListView, value: String?) in
-        view.setNoteHeroID(value)
-      }
-
-      Prop("noteHeroMeta") { (view: YohakuListView, value: String?) in
-        view.setNoteHeroMeta(value)
-      }
-
-      Prop("noteHeroMetaColor") { (view: YohakuListView, value: UIColor?) in
-        view.setNoteHeroMetaColor(value)
-      }
-
-      Prop("noteHeroTitle") { (view: YohakuListView, value: String?) in
-        view.setNoteHeroTitle(value)
-      }
-
-      Prop("noteHeroTitleColor") { (view: YohakuListView, value: UIColor?) in
-        view.setNoteHeroTitleColor(value)
-      }
-
-      Prop("topEdgeEffectHidden") { (view: YohakuListView, hidden: Bool) in
-        view.setTopEdgeEffectHidden(hidden)
-      }
-    }
-
-    View(YohakuListCellView.self) {
-      ViewName("YohakuListCell")
-
-      Prop("itemId") { (view: YohakuListCellView, id: String) in
-        view.setItemId(id)
       }
     }
 

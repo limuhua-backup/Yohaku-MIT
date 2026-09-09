@@ -1,6 +1,5 @@
 import { count, desc, eq, sql } from 'drizzle-orm'
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite'
-import { useRouter } from 'expo-router'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
 
@@ -11,7 +10,6 @@ import { db } from '@/db'
 import { posts } from '@/db/schema'
 import { useLocale, useTranslations } from '@/i18n'
 import { formatRelativeTime } from '@/lib/datetime'
-import { openPost } from '@/lib/open-article'
 import { ingestPostPage, syncAll } from '@/sync/engine'
 import { useListBodyIngest } from '@/sync/use-list-body-ingest'
 import { usePalette } from '@/theme/palette'
@@ -36,7 +34,6 @@ import {
 } from './post-list'
 
 export function PostsListScreen() {
-  const router = useRouter()
   const locale = useLocale()
   const t = useTranslations('list')
   const palette = usePalette()
@@ -256,23 +253,6 @@ export function PostsListScreen() {
         onEndReached={onEndReached}
         onRefresh={onRefresh}
         onVisibleItems={(items) => setVisibleIds(articleIdsFromVisible(items))}
-        onItemPress={({ id }) => {
-          const post = postsById.get(id)
-          if (post) openPost(router, post)
-        }}
-        onLinkPress={(kind, value) => {
-          if (kind === 'category') {
-            router.push({
-              pathname: '/categories/[slug]',
-              params: { slug: value },
-            })
-          } else if (kind === 'tag') {
-            router.push({
-              pathname: '/posts/tag/[name]',
-              params: { name: value },
-            })
-          }
-        }}
       />
     </View>
   )
