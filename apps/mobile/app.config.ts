@@ -12,6 +12,7 @@ import {
 // Keep in lockstep with `publicSite` in src/site-config.ts.
 const PUBLIC_SCHEME = 'yohaku'
 const PUBLIC_BUNDLE_ID = 'dev.yohaku.app'
+const PUBLIC_VERSION = '1.0.1'
 
 interface OverlayExpo {
   appleTeamId?: string
@@ -39,6 +40,7 @@ interface OverlayExpo {
     }
     requestHeaders?: Record<string, string>
   }
+  version?: string
 }
 
 function readOverlayExpo(file: string | null): OverlayExpo | null {
@@ -114,7 +116,7 @@ export function createAppConfig(): ExpoConfig {
   return {
     name: 'Yohaku',
     slug: 'yohaku',
-    version: '1.0.1',
+    version: overlayExpo?.version ?? PUBLIC_VERSION,
     orientation: 'portrait',
     icon: overlayExpo?.icon ?? './assets/images/icon.png',
     scheme: site.scheme,
